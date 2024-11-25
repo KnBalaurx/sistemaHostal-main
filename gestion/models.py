@@ -149,7 +149,7 @@ class Reserva(models.Model):
     def clean(self):
         """Método para validar que la fecha de ingreso no sea anterior a la fecha de registro"""
         if self.fecha_ingreso < self.fecha_registro:
-            raise ValidationError('La fecha de ingreso no puede ser anterior a la fecha de registro.')
+            raise ValidationError('La fecha de ingreso no puede ser anterior a la fecha de actual.')
 
     def __str__(self):
         return f"Reserva {self.id} - Habitación {self.habitacion}"

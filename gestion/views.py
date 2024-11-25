@@ -1,9 +1,9 @@
-from datetime import timezone
+from datetime import datetime, timezone
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib import messages
-from django.urls import reverse
+from django.urls import reverse # type: ignore
 from gestion.models import Trabajador, Reserva, Cliente, Habitacion
 from gestion.forms import ClienteForm, ReservaForm
 from django.shortcuts import get_object_or_404
@@ -83,7 +83,7 @@ def editar_cliente(request, cliente_id):
         if form.is_valid():
             form.save()
             messages.success(request, "Cliente actualizado correctamente.")
-            return redirect(reverse('clientes'))
+            return redirect(reverse('tabla_clientes'))
         else:
             messages.error(request, "Por favor, corrige los errores en el formulario.")
     else:
@@ -104,7 +104,7 @@ def agregar_reserva(request):
             habitacion = form.cleaned_data['habitacion']
             fecha_ingreso = form.cleaned_data['fecha_ingreso']
             noches = form.cleaned_data['noches']
-            fecha_registro = timezone.now()  # Fecha de registro es la fecha actual
+            fecha_registro = datetime.now()  # Fecha de registro es la fecha actual
 
             # Calcula el precio final basado en las noches y el precio de la habitación
             precio_final = habitacion.precio * noches

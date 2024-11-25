@@ -42,7 +42,7 @@ class ReservaForm(forms.ModelForm):
             'cliente',
             'origen',
             'estado',
-            'fecha_ingreso',  # Agregamos el campo 'fecha_ingreso' al formulario
+            'fecha_ingreso', 
             'noches',
         ]
         widgets = {
@@ -50,6 +50,6 @@ class ReservaForm(forms.ModelForm):
             'cliente': forms.Select(attrs={'class': 'form-control'}),
             'origen': forms.Select(attrs={'class': 'form-control'}),
             'estado': forms.Select(attrs={'class': 'form-control'}),
-            'fecha_ingreso': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),  # Widget para fecha_ingreso
+            'fecha_ingreso': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),  # Cambia aquí
             'noches': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
