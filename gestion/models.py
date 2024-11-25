@@ -14,6 +14,14 @@ from django.utils.timezone import now
 class Cliente(models.Model):
     """
     Modelo que representa un cliente del hostal con validaciones completas.
+
+    Attributes:
+        - rut: Identificador único del cliente en formato RUT.
+        - nombre: Nombre del cliente.
+        - apellido: Apellido del cliente.
+        - correo: Correo electrónico del cliente.
+        - telefono: Número de contacto con validación para formato chileno.
+        - fecha_registro: Fecha y hora de registro en el sistema.
     """
     rut = models.CharField(
         max_length=12,
@@ -49,19 +57,23 @@ class Cliente(models.Model):
                 regex=r'^\+569\d{8}$',
                 message="El número de teléfono debe estar en el formato '+56912345678'."
             )], help_text="Debe ingresar un número con el formato '+56912345678'.")
-    password_hash = models.CharField(max_length=255)
     fecha_registro = models.DateTimeField(default=now)
 
     def __str__(self):
-        return f"{self.nombre} {self.apellido} ({self.rut})"
+        """
+        Representa al cliente en forma de cadena.
 
+        Returns:
+            Una cadena que incluye el nombre completo y el RUT del cliente.
+        """
+        return f"{self.nombre} {self.apellido} ({self.rut})"
 
 
 class Trabajador(models.Model):
     """
     Modelo que representa un trabajador del hostal.
 
-    Atributos:
+    Attributes:
         - rut: Identificador único del trabajador.
         - nombre: Nombre del trabajador.
         - apellido: Apellido del trabajador.
@@ -90,6 +102,12 @@ class Trabajador(models.Model):
             )])
 
     def __str__(self):
+        """
+        Representa al trabajador en forma de cadena.
+
+        Returns:
+            Una cadena que incluye el nombre completo y el RUT del trabajador.
+        """
         return f"{self.nombre} {self.apellido} ({self.rut})"
 
 
@@ -97,7 +115,7 @@ class Habitacion(models.Model):
     """
     Modelo que representa una habitación del hostal.
 
-    Atributos:
+    Attributes:
         - numero_habitacion: Número identificador de la habitación.
         - precio: Precio de la habitación.
         - estado: Estado actual de la habitación (disponible, reservada, etc.).
@@ -115,10 +133,30 @@ class Habitacion(models.Model):
     ], default="disponible")
 
     def __str__(self):
+        """
+        Representa la habitación en forma de cadena.
+
+        Returns:
+            Una cadena que incluye el número de la habitación y su estado actual.
+        """
         return f"Habitación {self.numero_habitacion} - {self.estado}"
 
 
 class Reserva(models.Model):
+    """
+    Modelo que representa una reserva.
+
+    Atributos:
+        - habitacion: Relación con el modelo Habitacion.
+        - trabajador: Relación con el modelo Trabajador.
+        - cliente: Relación con el modelo Cliente.
+        - origen: Indica cómo se realizó la reserva.
+        - estado: Estado actual de la reserva (pendiente, pagada, etc.).
+        - fecha_registro: Fecha y hora en que se registró la reserva.
+        - noches: Cantidad de noches reservadas.
+        - precio_final: Precio total de la reserva.
+        - fecha_ingreso: Fecha de inicio de la estadía.
+    """
     habitacion = models.ForeignKey(Habitacion, on_delete=models.CASCADE)
     trabajador = models.ForeignKey(Trabajador, on_delete=models.SET_NULL, null=True, blank=True)
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True)
@@ -139,19 +177,43 @@ class Reserva(models.Model):
         ])
     precio_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     fecha_ingreso = models.DateTimeField(default=now, blank=True)
-    
+
     @property
     def valor_total(self):
+        """
+        Calcula el valor total de la reserva.
+
+        Basado en:
+            - Precio por noche de la habitación.
+            - Número de noches reservadas.
+
+        Returns:
+            El costo total de la reserva o 0 si no se han definido habitación o noches.
+        """
         if self.habitacion and self.noches:
             return self.habitacion.precio * self.noches
         return 0
-    
+
     def clean(self):
-        """Método para validar que la fecha de ingreso no sea anterior a la fecha de registro"""
+        """
+        Realiza una validación personalizada para la reserva.
+
+        Valida que:
+            - La fecha de ingreso no sea anterior a la fecha de registro.
+
+        Lanza:
+            ValidationError: Si la fecha de ingreso es anterior a la fecha de registro.
+        """
         if self.fecha_ingreso < self.fecha_registro:
-            raise ValidationError('La fecha de ingreso no puede ser anterior a la fecha de actual.')
+            raise ValidationError('La fecha de ingreso no puede ser anterior a la fecha de registro.')
 
     def __str__(self):
+        """
+        Representa la reserva en forma de cadena.
+
+        Returns:
+            Una cadena que incluye el ID de la reserva y el número de la habitación asociada.
+        """
         return f"Reserva {self.id} - Habitación {self.habitacion}"
 
 
@@ -159,7 +221,7 @@ class CheckIn(models.Model):
     """
     Modelo que representa un registro de entrada (Check-In).
 
-    Atributos:
+    Attributes:
         - reserva: Reserva asociada al Check-In.
         - fecha_hora: Fecha y hora del Check-In.
         - qr_escaneado: Indica si el QR fue escaneado.
@@ -172,6 +234,12 @@ class CheckIn(models.Model):
     ], default="no")
 
     def __str__(self):
+        """
+        Representa el registro de entrada (Check-In) en forma de cadena.
+
+        Returns:
+            Una cadena que incluye el ID de la reserva asociada al Check-In.
+        """
         return f"Check-In de Reserva {self.reserva.id}"
 
 
@@ -179,7 +247,7 @@ class CheckOut(models.Model):
     """
     Modelo que representa un registro de salida (Check-Out).
 
-    Atributos:
+    Attributes:
         - reserva: Reserva asociada al Check-Out.
         - fecha_hora: Fecha y hora del Check-Out.
         - qr_escaneado: Indica si el QR fue escaneado.
@@ -192,4 +260,10 @@ class CheckOut(models.Model):
     ], default="no")
 
     def __str__(self):
+        """
+        Representa el registro de salida (Check-Out) en forma de cadena.
+
+        Returns:
+            Una cadena que incluye el ID de la reserva asociada al Check-Out.
+        """
         return f"Check-Out de Reserva {self.reserva.id}"
