@@ -21,15 +21,10 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-2 p-4 border-end">
-                <h5>Ingresar manualmente:</h5>
                 <a href="{% url 'agregar_cliente' %}" class="btn btn-primary mb-4 d-block">Agregar Cliente</a>
                 <a href="{% url 'agregar_reserva' %}" class="btn btn-primary mb-4 d-block">Agregar Reserva</a>
-
-                <h5>Tabla Clientes:</h5>
-                <a href="{% url 'tabla_clientes' %}" class="btn btn-primary mb-5 d-block">Ver Clientes</a>
-
-                <h5>Tabla Habitaciones:</h5>
                 <a href="{% url 'tabla_habitaciones' %}" class="btn btn-primary mb-5 d-block">Ver Habitaciones</a>
+                <a href="{% url 'tabla_clientes' %}" class="btn btn-primary mb-5 d-block">Ver Clientes</a>      
             </div>
 
             <div class="col-md-9 p-3 d-flex justify-content-center align-items-center flex-column">
