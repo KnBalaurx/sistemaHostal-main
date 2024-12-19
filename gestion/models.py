@@ -100,6 +100,11 @@ class Trabajador(models.Model):
                 regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$',
                 message="El apellido solo puede contener letras y espacios."
             )])
+    correo = models.EmailField(
+        max_length=100,
+        validators=[
+            EmailValidator(message="Debe ingresar un correo válido.")
+        ], blank=True, null=True)  # Nuevo campo correo agregado
 
     def __str__(self):
         """
@@ -194,18 +199,38 @@ class Reserva(models.Model):
             return self.habitacion.precio * self.noches
         return 0
 
+
     def clean(self):
         """
         Realiza una validación personalizada para la reserva.
 
         Valida que:
+            - La habitación no esté ocupada.
             - La fecha de ingreso no sea anterior a la fecha de registro.
-
-        Lanza:
-            ValidationError: Si la fecha de ingreso es anterior a la fecha de registro.
+            - El precio final sea coherente con el precio calculado.
         """
         if self.fecha_ingreso < self.fecha_registro:
-            raise ValidationError('La fecha de ingreso no puede ser anterior a la fecha de registro.')
+            raise ValidationError("La fecha de ingreso no puede ser anterior a la fecha de registro.")
+
+        if self.habitacion.estado not in ['disponible', 'reservada']:
+            raise ValidationError(f"La habitación {self.habitacion.numero_habitacion} no está disponible para reserva.")
+
+        precio_calculado = self.habitacion.precio * self.noches
+        if self.precio_final is not None and self.precio_final != precio_calculado:
+            raise ValidationError(f"El precio final debe ser {precio_calculado}, pero se ingresó {self.precio_final}.")
+
+
+    def save(self, *args, **kwargs):
+        """
+        Realiza validaciones y guarda la reserva.
+
+        Actualiza el estado de la habitación a 'reservada' si la reserva es válida.
+        """
+        self.clean()
+        super().save(*args, **kwargs)
+        if self.estado == "pendiente":
+            self.habitacion.estado = "reservada"
+            self.habitacion.save()
 
     def __str__(self):
         """
@@ -215,6 +240,7 @@ class Reserva(models.Model):
             Una cadena que incluye el ID de la reserva y el número de la habitación asociada.
         """
         return f"Reserva {self.id} - Habitación {self.habitacion}"
+
 
 
 class CheckIn(models.Model):

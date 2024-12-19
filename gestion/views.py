@@ -6,6 +6,7 @@ from django.urls import reverse
 from gestion.models import Trabajador, Reserva, Cliente, Habitacion
 from gestion.forms import ClienteForm, ReservaForm
 from django.shortcuts import get_object_or_404
+from django.utils.timezone import now
 
 def login_trabajador(request):
     """
@@ -129,13 +130,21 @@ def agregar_reserva(request):
             fecha_ingreso = form.cleaned_data['fecha_ingreso']
             noches = form.cleaned_data['noches']
             fecha_registro = datetime.now()
-            
+
+            # Validar que la fecha de ingreso no sea anterior a la actual
+            if fecha_ingreso < now():
+                messages.error(request, "La fecha de ingreso no puede ser anterior a la actual.")
+                return render(request, 'gestion/agregar_reserva.html', {'form': form})
+
+            # Verificar si la habitación está ocupada
+            if habitacion.estado == "ocupada":
+                messages.error(request, "La habitación está ocupada y no puede ser reservada.")
+                return render(request, 'gestion/agregar_reserva.html', {'form': form})
+
             precio_final = habitacion.precio * noches
             reserva = form.save(commit=False)
             reserva.precio_final = precio_final
-
             reserva.estado = "pendiente"
-
             reserva.fecha_registro = fecha_registro
             reserva.save()
 
@@ -143,7 +152,7 @@ def agregar_reserva(request):
             habitacion.save()
 
             messages.success(request, "Reserva agregada correctamente.")
-            return redirect('home')
+            return redirect('home')  # Redirige a la página principal después de crear la reserva
         else:
             messages.error(request, "Por favor, corrige los errores en el formulario.")
     else:
@@ -152,7 +161,6 @@ def agregar_reserva(request):
     habitaciones_disponibles = Habitacion.objects.filter(estado="disponible")
     data = {'form': form, 'habitaciones': habitaciones_disponibles}
     return render(request, 'gestion/agregar_reserva.html', data)
-
 def editar_reserva(request, pk):
     """
     Permite editar una reserva existente.
