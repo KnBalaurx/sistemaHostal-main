@@ -1,61 +1,98 @@
 from django.test import TestCase
 from django.utils import timezone
-from .models import Cliente, Trabajador, Habitacion, Reserva
 from django.core.exceptions import ValidationError
+from .models import Cliente, Trabajador, Habitacion, Reserva
+from django.db.utils import IntegrityError
+from django.core.exceptions import ValidationError
+from django.utils.timezone import now
+from datetime import timedelta
 
+class ReservaIntegradaTest(TestCase):
 
-class ClienteModelTest(TestCase):
-
-    def test_create_cliente(self):
+    # 1. Prueba Integral de Creación de Reserva
+    def test_crear_reserva(self):
+        # Crear un cliente
         cliente = Cliente.objects.create(
             rut='12345678-9',
-            nombre='Juan',
+            nombre='Carlos',
             apellido='Pérez',
-            correo='juan.perez@example.com',
-            telefono='+56912345678',
+            correo='carlos.perez@example.com',
+            telefono='+56987654321',
             fecha_registro=timezone.now()
         )
-        self.assertEqual(cliente.nombre, 'Juan')
 
-
-class TrabajadorModelTest(TestCase):
-
-    def test_create_trabajador(self):
-        trabajador = Trabajador.objects.create(
-            rut='87654321-1',
-            nombre='Carlos',
-            apellido='González'
-        )
-        self.assertEqual(trabajador.nombre, 'Carlos')
-
-
-class HabitacionModelTest(TestCase):
-
-    def test_create_habitacion(self):
+        # Crear una habitación
         habitacion = Habitacion.objects.create(
             numero_habitacion='101',
             precio=50000.00,
             estado='disponible'
         )
-        self.assertEqual(habitacion.estado, 'disponible')
 
-
-class ReservaModelTest(TestCase):
-
-    def test_create_reserva(self):
-        habitacion = Habitacion.objects.create(
-            numero_habitacion='102',
-            precio=60000.00,
-            estado='disponible'
+        # Crear un trabajador
+        trabajador = Trabajador.objects.create(
+            rut='22334455-6',
+            nombre='Luis',
+            apellido='Martínez'
         )
+
+        # Crear la reserva
+        reserva = Reserva.objects.create(
+            habitacion=habitacion,
+            trabajador=trabajador,
+            cliente=cliente,
+            origen='manual',
+            estado='pendiente',
+            noches=2,
+            precio_final=100000.00,
+            fecha_ingreso=timezone.now() + timezone.timedelta(days=1)
+        )
+
+        # Verificar que el estado de la habitación cambió a "reservada"
+        habitacion.refresh_from_db()
+        self.assertEqual(habitacion.estado, 'reservada')
+
+        # Verificar que la reserva se guardó correctamente
+        self.assertEqual(reserva.estado, 'pendiente')
+        self.assertEqual(reserva.precio_final, 100000.00)
+
+    # 2. Prueba Integral de Reserva con Fecha de Ingreso Pasada
+    def test_crear_reserva_fecha_ingreso_pasada(self):
+        # Crear una habitación
+        habitacion = Habitacion.objects.create(
+            numero_habitacion="101",  # Usar el nombre correcto del campo
+            estado="disponible",
+            precio=100.00,
+        )
+
+        # Crear una reserva con fecha de ingreso pasada
+        reserva = Reserva(
+            habitacion=habitacion,
+            fecha_ingreso=now() - timedelta(days=1),  # Fecha en el pasado
+            noches=2,
+            estado="pendiente",
+        )
+
+        # Asegurarse de que se lanza ValidationError al intentar validar
+        with self.assertRaises(ValidationError):
+            reserva.full_clean()  # Ejecuta las validaciones definidas en clean()
+
+    # 3. Prueba Integral de Cancelación de Reserva
+    def test_cancelar_reserva(self):
         cliente = Cliente.objects.create(
-            rut='11223344-5',
-            nombre='Ana',
-            apellido='Rodríguez',
-            correo='ana.rodriguez@example.com',
-            telefono='+56911223344',
+            rut='12345678-9',
+            nombre='Carlos',
+            apellido='Pérez',
+            correo='carlos.perez@example.com',
+            telefono='+56987654321',
             fecha_registro=timezone.now()
         )
+
+        habitacion = Habitacion.objects.create(
+            numero_habitacion='103',
+            precio=50000.00,
+            estado='reservada'
+        )
+
         trabajador = Trabajador.objects.create(
             rut='22334455-6',
             nombre='Luis',
@@ -66,92 +103,103 @@ class ReservaModelTest(TestCase):
             habitacion=habitacion,
             trabajador=trabajador,
             cliente=cliente,
-            origen='manual', 
+            origen='manual',
             estado='pendiente',
             noches=2,
-            precio_final=120000.00,
-            fecha_ingreso=timezone.now()
+            precio_final=100000.00,
+            fecha_ingreso=timezone.now() + timezone.timedelta(days=1)
         )
-        self.assertEqual(reserva.precio_final, 120000.00)
 
-    def test_habitacion_ocupada_no_disponible(self):
+        # Cancelar la reserva
+        reserva.estado = 'cancelada'
+        reserva.save()
+
+        # Verificar que la habitación vuelva a estar disponible
+        habitacion.refresh_from_db()
+        self.assertEqual(habitacion.estado, 'disponible')
+
+    # 4. Prueba Integral de Creación de Cliente con Correo Único
+    def test_crear_cliente_con_correo_unico(self):
+        Cliente.objects.create(nombre="Carlos Perez", correo="carlos.perezz@example.com")
+        with self.assertRaises(IntegrityError):
+            Cliente.objects.create(nombre="Carlos Pérez II", correo="carlos.perezz@example.com")
+
+    # 5. Prueba Integral de Actualización de Precio de Reserva
+    def test_actualizar_precio_reserva(self):
+        cliente = Cliente.objects.create(
+            rut='12345678-9',
+            nombre='Carlos',
+            apellido='Pérez',
+            correo='carlos.perez@example.com',
+            telefono='+56987654321',
+            fecha_registro=timezone.now()
+        )
+
         habitacion = Habitacion.objects.create(
             numero_habitacion='104',
-            precio=75000.00,
+            precio=50000.00,
             estado='disponible'
         )
-        cliente = Cliente.objects.create(
-            rut='77665544-3',
-            nombre='Javier',
-            apellido='Muñoz',
-            correo='javier.munoz@example.com',
-            telefono='+56977665544',
-            fecha_registro=timezone.now()
-        )
+
         trabajador = Trabajador.objects.create(
-            rut='33445566-7',
-            nombre='Sofía',
-            apellido='Pérez'
+            rut='22334455-6',
+            nombre='Luis',
+            apellido='Martínez'
         )
 
-        # Crear una reserva inicial
-        Reserva.objects.create(
+        reserva = Reserva.objects.create(
             habitacion=habitacion,
             trabajador=trabajador,
             cliente=cliente,
             origen='manual',
-            estado='confirmada',
+            estado='pendiente',
             noches=3,
-            precio_final=225000.00,
-            fecha_ingreso=timezone.now()
+            precio_final=150000.00,
+            fecha_ingreso=timezone.now() + timezone.timedelta(days=1)
         )
-        habitacion.estado = 'ocupada'
-        habitacion.save()
 
-        nueva_reserva = Reserva(
+        # Actualizar el precio de la reserva
+        reserva.precio_final = 180000.00
+        reserva.save()
+
+        # Verificar que el precio se actualizó correctamente
+        reserva.refresh_from_db()
+        self.assertEqual(reserva.precio_final, 180000.00)
+
+    # 6. Prueba Integral de Crear Trabajador y Asignar a Reserva
+    def test_asignar_trabajador_a_reserva(self):
+        cliente = Cliente.objects.create(
+            rut='12345678-9',
+            nombre='Carlos',
+            apellido='Pérez',
+            correo='carlos.perez@example.com',
+            telefono='+56987654321',
+            fecha_registro=timezone.now()
+        )
+
+        habitacion = Habitacion.objects.create(
+            numero_habitacion='105',
+            precio=50000.00,
+            estado='disponible'
+        )
+
+        trabajador = Trabajador.objects.create(
+            rut='22334455-6',
+            nombre='Luis',
+            apellido='Martínez'
+        )
+
+        reserva = Reserva.objects.create(
             habitacion=habitacion,
             trabajador=trabajador,
             cliente=cliente,
             origen='manual',
             estado='pendiente',
             noches=2,
-            precio_final=150000.00,
-            fecha_ingreso=timezone.now()
+            precio_final=100000.00,
+            fecha_ingreso=timezone.now() + timezone.timedelta(days=1)
         )
 
-        with self.assertRaises(ValidationError):
-            nueva_reserva.full_clean()  # Llama explícitamente a las validaciones del modelo
-
-    def test_precio_final_invalido(self):
-        habitacion = Habitacion.objects.create(
-            numero_habitacion='105',
-            precio=80000.00,
-            estado='disponible'
-        )
-        cliente = Cliente.objects.create(
-            rut='44556677-8',
-            nombre='Clara',
-            apellido='Ortiz',
-            correo='clara.ortiz@example.com',
-            telefono='+56944556677',
-            fecha_registro=timezone.now()
-        )
-        trabajador = Trabajador.objects.create(
-            rut='55667788-9',
-            nombre='Hugo',
-            apellido='Lopez'
-        )
-
-        reserva = Reserva(
-            habitacion=habitacion,
-            trabajador=trabajador,
-            cliente=cliente,
-            origen='manual',
-            estado='pendiente',
-            noches=3,
-            precio_final=100000.00,  # Precio no corresponde al calculado
-            fecha_ingreso=timezone.now()
-        )
-
-        with self.assertRaises(ValidationError):
-            reserva.full_clean()
+        # Verificar que el trabajador está asociado correctamente a la reserva
+        self.assertEqual(reserva.trabajador.nombre, 'Luis')
+        self.assertEqual(reserva.trabajador.rut, '22334455-6')

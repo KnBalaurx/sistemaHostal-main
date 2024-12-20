@@ -75,6 +75,10 @@ def agregar_cliente(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         if form.is_valid():
+            # Verificar si el correo ya existe
+            if Cliente.objects.filter(correo=form.cleaned_data['correo']).exists():
+                messages.error(request, "El correo ya está registrado.")
+                return render(request, 'gestion/agregar_cliente.html', {'form': form})
             form.save()
             return redirect('tabla_clientes')
         else:
@@ -132,7 +136,7 @@ def agregar_reserva(request):
             fecha_registro = datetime.now()
 
             # Validar que la fecha de ingreso no sea anterior a la actual
-            if fecha_ingreso < now():
+            if fecha_ingreso < now().date():  # Comparar con la fecha actual
                 messages.error(request, "La fecha de ingreso no puede ser anterior a la actual.")
                 return render(request, 'gestion/agregar_reserva.html', {'form': form})
 
@@ -161,6 +165,7 @@ def agregar_reserva(request):
     habitaciones_disponibles = Habitacion.objects.filter(estado="disponible")
     data = {'form': form, 'habitaciones': habitaciones_disponibles}
     return render(request, 'gestion/agregar_reserva.html', data)
+
 def editar_reserva(request, pk):
     """
     Permite editar una reserva existente.
@@ -186,6 +191,8 @@ def editar_reserva(request, pk):
     else:
         form = ReservaForm(instance=reserva)
     return render(request, "gestion/editar_reserva.html", {"form": form, "reserva": reserva})
+
+
 
 def home(request):
     """

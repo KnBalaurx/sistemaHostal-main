@@ -46,10 +46,11 @@ class Cliente(models.Model):
                 message="El apellido solo puede contener letras y espacios."
             )])
     correo = models.EmailField(
-        max_length=100,
-        validators=[
-            EmailValidator(message="Debe ingresar un correo válido.")
-        ])
+    max_length=100,
+    unique=True,
+    validators=[
+        EmailValidator(message="Debe ingresar un correo válido.")
+    ])
     telefono = models.CharField(
         max_length=12,
         validators=[
@@ -148,23 +149,9 @@ class Habitacion(models.Model):
 
 
 class Reserva(models.Model):
-    """
-    Modelo que representa una reserva.
-
-    Atributos:
-        - habitacion: Relación con el modelo Habitacion.
-        - trabajador: Relación con el modelo Trabajador.
-        - cliente: Relación con el modelo Cliente.
-        - origen: Indica cómo se realizó la reserva.
-        - estado: Estado actual de la reserva (pendiente, pagada, etc.).
-        - fecha_registro: Fecha y hora en que se registró la reserva.
-        - noches: Cantidad de noches reservadas.
-        - precio_final: Precio total de la reserva.
-        - fecha_ingreso: Fecha de inicio de la estadía.
-    """
-    habitacion = models.ForeignKey(Habitacion, on_delete=models.CASCADE)
-    trabajador = models.ForeignKey(Trabajador, on_delete=models.SET_NULL, null=True, blank=True)
-    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True)
+    habitacion = models.ForeignKey('Habitacion', on_delete=models.CASCADE)
+    trabajador = models.ForeignKey('Trabajador', on_delete=models.SET_NULL, null=True, blank=True)
+    cliente = models.ForeignKey('Cliente', on_delete=models.SET_NULL, null=True, blank=True)
     origen = models.CharField(max_length=20, choices=[
         ("manual", "Manual"),
         ("otra_plataforma", "Otra Plataforma")
@@ -177,70 +164,53 @@ class Reserva(models.Model):
     fecha_registro = models.DateTimeField(default=now)
     noches = models.PositiveIntegerField(
         default=1,
-        validators=[
-            MinValueValidator(1, message="Debe haber al menos una noche en la reserva.")
-        ])
+        validators=[MinValueValidator(1, message="Debe haber al menos una noche en la reserva.")]
+    )
     precio_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    fecha_ingreso = models.DateTimeField(default=now, blank=True)
+    fecha_ingreso = models.DateTimeField()
 
     @property
     def valor_total(self):
         """
-        Calcula el valor total de la reserva.
-
-        Basado en:
-            - Precio por noche de la habitación.
-            - Número de noches reservadas.
-
-        Returns:
-            El costo total de la reserva o 0 si no se han definido habitación o noches.
+        Calcula el valor total de la reserva según el precio por noche y las noches reservadas.
         """
         if self.habitacion and self.noches:
             return self.habitacion.precio * self.noches
         return 0
 
-
     def clean(self):
         """
-        Realiza una validación personalizada para la reserva.
-
-        Valida que:
-            - La habitación no esté ocupada.
-            - La fecha de ingreso no sea anterior a la fecha de registro.
-            - El precio final sea coherente con el precio calculado.
+        Valida los datos de la reserva antes de guardar.
         """
+        if self.fecha_ingreso < now():
+            raise ValidationError("La fecha de ingreso no puede ser en el pasado.")
+
         if self.fecha_ingreso < self.fecha_registro:
             raise ValidationError("La fecha de ingreso no puede ser anterior a la fecha de registro.")
 
         if self.habitacion.estado not in ['disponible', 'reservada']:
             raise ValidationError(f"La habitación {self.habitacion.numero_habitacion} no está disponible para reserva.")
 
-        precio_calculado = self.habitacion.precio * self.noches
+        precio_calculado = self.valor_total
         if self.precio_final is not None and self.precio_final != precio_calculado:
             raise ValidationError(f"El precio final debe ser {precio_calculado}, pero se ingresó {self.precio_final}.")
 
-
     def save(self, *args, **kwargs):
-        """
-        Realiza validaciones y guarda la reserva.
-
-        Actualiza el estado de la habitación a 'reservada' si la reserva es válida.
-        """
-        self.clean()
-        super().save(*args, **kwargs)
-        if self.estado == "pendiente":
+        if not self.pk and self.habitacion.estado == "disponible":  # Nueva reserva
             self.habitacion.estado = "reservada"
             self.habitacion.save()
+        elif self.pk:  # Actualización de reserva existente
+            original_reserva = Reserva.objects.get(pk=self.pk)
+            if original_reserva.estado != self.estado and self.estado == "cancelada":
+                self.habitacion.estado = "disponible"
+                self.habitacion.save()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """
         Representa la reserva en forma de cadena.
-
-        Returns:
-            Una cadena que incluye el ID de la reserva y el número de la habitación asociada.
         """
-        return f"Reserva {self.id} - Habitación {self.habitacion}"
-
+        return f"Reserva {self.id} - Habitación {self.habitacion} ({self.estado})"
 
 
 class CheckIn(models.Model):

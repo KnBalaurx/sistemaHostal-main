@@ -7,6 +7,8 @@ en las interfaces de la aplicación.
 """
 from django import forms
 from gestion.models import Cliente, Reserva
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class ClienteForm(forms.ModelForm):
     """
@@ -29,6 +31,11 @@ class ClienteForm(forms.ModelForm):
             'correo': forms.EmailInput(attrs={'class': 'form-control'}),
             'telefono': forms.TextInput(attrs={'class': 'form-control'}),
         }
+        def clean_correo(self):
+            correo = self.cleaned_data.get('correo')
+            if Cliente.objects.filter(correo=correo).exists():
+                raise ValidationError("Este correo ya está registrado.")
+            return correo
 
 
 class ReservaForm(forms.ModelForm):
@@ -61,3 +68,8 @@ class ReservaForm(forms.ModelForm):
             'fecha_ingreso': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'noches': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
         }
+        def clean_fecha_ingreso(self):
+            fecha_ingreso = self.cleaned_data.get('fecha_ingreso')
+            if fecha_ingreso < timezone.now().date():
+                raise ValidationError("La fecha de ingreso no puede ser anterior a la fecha actual.")
+            return fecha_ingreso
